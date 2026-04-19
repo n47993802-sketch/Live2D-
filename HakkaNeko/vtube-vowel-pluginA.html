@@ -1,0 +1,1045 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VowelSync — VTube Studio Plugin</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Oxanium:wght@300;400;600;800&display=swap');
+
+  :root {
+    --bg: #080c14;
+    --panel: #0d1424;
+    --border: #1a2a4a;
+    --accent: #00e5ff;
+    --accent2: #ff4081;
+    --green: #00ff88;
+    --yellow: #ffd740;
+    --text: #c8d8f0;
+    --dim: #4a6080;
+
+    --a-color: #ff4081;
+    --e-color: #ffd740;
+    --i-color: #00e5ff;
+    --o-color: #aa44ff;
+    --u-color: #00ff88;
+
+    --vol-color: #00e5ff;
+    --freq-color: #ffd740;
+    --bass-color: #ff4081;
+    --mid-color: #aa44ff;
+    --high-color: #00ff88;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Oxanium', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 24px 20px;
+    width: 100%;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 18px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .logo { display: flex; align-items: baseline; gap: 10px; }
+
+  .logo-title {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .logo-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--dim);
+    letter-spacing: 0.15em;
+  }
+
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--dim);
+    transition: all 0.3s;
+  }
+  .status-badge.connected { border-color: var(--green); color: var(--green); }
+  .status-dot { width:8px; height:8px; border-radius:50%; background:var(--dim); transition:all 0.3s; }
+  .status-badge.connected .status-dot { background:var(--green); box-shadow:0 0 8px var(--green); animation:blink 1.5s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* Mode switcher */
+  .mode-switcher {
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+  }
+  .mode-btn {
+    font-family: 'Oxanium', sans-serif;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: 0.06em;
+    padding: 7px 16px;
+    border: none;
+    background: transparent;
+    color: var(--dim);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .mode-btn.active { background: var(--accent); color: #000; }
+  .mode-btn:not(.active):hover { color: var(--text); }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px 18px;
+  }
+
+  .panel-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--dim);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+  }
+
+  canvas { width:100%; border-radius:4px; display:block; }
+  #waveCanvas { height:70px; background:#060a12; }
+  #specCanvas { height:110px; background:#060a12; }
+
+  .controls {
+    display: flex;
+    gap: 10px;
+    margin: 12px 0;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .spacer { flex:1; }
+
+  .btn {
+    font-family: 'Oxanium', sans-serif;
+    font-weight: 600;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    padding: 8px 18px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .btn-green   { background:var(--green);  color:#000; }
+  .btn-green:hover   { box-shadow:0 0 16px var(--green); }
+  .btn-primary { background:var(--accent); color:#000; }
+  .btn-primary:hover { box-shadow:0 0 16px var(--accent); }
+  .btn-ghost   { background:transparent; border:1px solid var(--border); color:var(--text); }
+  .btn-ghost:hover   { border-color:var(--accent); color:var(--accent); }
+
+  /* ── Desktop Audio cards ─── */
+  .da-row { display:flex; gap:10px; }
+
+  .da-card {
+    flex:1;
+    background:#060a12;
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:12px 8px;
+    text-align:center;
+    transition:border-color 0.15s;
+    position:relative;
+    overflow:hidden;
+  }
+  .da-card[data-da="vol"]  { --dc:var(--vol-color); }
+  .da-card[data-da="freq"] { --dc:var(--freq-color); }
+  .da-card[data-da="bass"] { --dc:var(--bass-color); }
+  .da-card[data-da="mid"]  { --dc:var(--mid-color); }
+  .da-card[data-da="high"] { --dc:var(--high-color); }
+
+  .da-card.active { border-color:var(--dc); }
+  .da-card.active::after {
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:6px;
+    box-shadow:0 0 18px var(--dc) inset;
+    pointer-events:none;
+  }
+
+  .da-label {
+    font-family:'Share Tech Mono', monospace;
+    font-size:9px;
+    letter-spacing:0.12em;
+    color:var(--dc);
+    margin-bottom:5px;
+    opacity:0.9;
+  }
+  .da-value {
+    font-size:20px;
+    font-weight:800;
+    color:var(--dc);
+    line-height:1;
+    margin-bottom:5px;
+    font-variant-numeric:tabular-nums;
+  }
+  .da-bar-wrap {
+    height:48px;
+    background:#0a1020;
+    border-radius:4px;
+    overflow:hidden;
+    display:flex;
+    align-items:flex-end;
+  }
+  .da-bar {
+    width:100%;
+    background:var(--dc);
+    border-radius:2px;
+    transition:height 0.07s ease-out;
+    opacity:0.8;
+    height:0%;
+  }
+  .da-param-name {
+    font-family:'Share Tech Mono', monospace;
+    font-size:8px;
+    color:var(--dim);
+    margin-top:5px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  /* ── Vowel cards ─── */
+  .vowels-row { display:flex; gap:10px; }
+
+  .vowel-card {
+    flex:1;
+    background:#060a12;
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:14px 8px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+    transition:border-color 0.15s;
+  }
+  .vowel-card[data-v="A"] { --vc:var(--a-color); }
+  .vowel-card[data-v="E"] { --vc:var(--e-color); }
+  .vowel-card[data-v="I"] { --vc:var(--i-color); }
+  .vowel-card[data-v="O"] { --vc:var(--o-color); }
+  .vowel-card[data-v="U"] { --vc:var(--u-color); }
+  .vowel-card.active { border-color:var(--vc); }
+  .vowel-card.active::after {
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:6px;
+    box-shadow:0 0 20px var(--vc) inset;
+    pointer-events:none;
+  }
+  .vowel-letter {
+    font-size:32px;
+    font-weight:800;
+    line-height:1;
+    margin-bottom:7px;
+    color:var(--vc);
+    text-shadow:0 0 20px var(--vc);
+  }
+  .vowel-bar-wrap {
+    height:52px;
+    background:#0a1020;
+    border-radius:4px;
+    margin:7px 0;
+    overflow:hidden;
+    display:flex;
+    align-items:flex-end;
+  }
+  .vowel-bar {
+    width:100%;
+    background:var(--vc);
+    border-radius:2px;
+    transition:height 0.08s ease-out;
+    opacity:0.85;
+    height:0%;
+  }
+  .vowel-value {
+    font-family:'Share Tech Mono', monospace;
+    font-size:12px;
+    color:var(--vc);
+    opacity:0.8;
+  }
+
+  /* ── Bottom grid ─── */
+  .bottom-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:14px;
+    margin-top:14px;
+  }
+
+  input[type="text"] {
+    background:#060a12;
+    border:1px solid var(--border);
+    border-radius:4px;
+    color:var(--text);
+    font-family:'Share Tech Mono', monospace;
+    font-size:12px;
+    padding:7px 10px;
+    outline:none;
+    transition:border-color 0.2s;
+    width:100%;
+  }
+  input:focus { border-color:var(--accent); }
+
+  .label-sm {
+    font-family:'Share Tech Mono', monospace;
+    font-size:10px;
+    color:var(--dim);
+    margin-bottom:4px;
+    letter-spacing:0.1em;
+  }
+
+  .param-row {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:6px;
+  }
+
+  .tag {
+    width:34px; height:26px;
+    border-radius:4px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:800;
+    font-size:10px;
+    flex-shrink:0;
+    font-family:'Share Tech Mono', monospace;
+    letter-spacing:0.03em;
+  }
+  .tag[data-v="A"] { background:rgba(255,64,129,0.15); color:var(--a-color); font-size:14px; }
+  .tag[data-v="E"] { background:rgba(255,215,64,0.15); color:var(--e-color); font-size:14px; }
+  .tag[data-v="I"] { background:rgba(0,229,255,0.15);  color:var(--i-color); font-size:14px; }
+  .tag[data-v="O"] { background:rgba(170,68,255,0.15); color:var(--o-color); font-size:14px; }
+  .tag[data-v="U"] { background:rgba(0,255,136,0.15);  color:var(--u-color); font-size:14px; }
+  .tag[data-da="vol"]  { background:rgba(0,229,255,0.12);  color:var(--vol-color); }
+  .tag[data-da="freq"] { background:rgba(255,215,64,0.12);  color:var(--freq-color); }
+  .tag[data-da="bass"] { background:rgba(255,64,129,0.12);  color:var(--bass-color); }
+  .tag[data-da="mid"]  { background:rgba(170,68,255,0.12);  color:var(--mid-color); }
+  .tag[data-da="high"] { background:rgba(0,255,136,0.12);   color:var(--high-color); }
+
+  .slider-wrap {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:8px;
+  }
+  .slider-label {
+    font-family:'Share Tech Mono', monospace;
+    font-size:10px;
+    color:var(--dim);
+    width:52px;
+    flex-shrink:0;
+  }
+  input[type="range"] {
+    flex:1;
+    -webkit-appearance:none;
+    height:3px;
+    background:var(--border);
+    border-radius:2px;
+    outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance:none;
+    width:13px; height:13px;
+    border-radius:50%;
+    background:var(--accent);
+    cursor:pointer;
+    box-shadow:0 0 6px var(--accent);
+  }
+  .slider-val {
+    font-family:'Share Tech Mono', monospace;
+    font-size:11px;
+    color:var(--accent);
+    width:32px;
+    text-align:right;
+  }
+
+  .toggle-row {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:8px;
+  }
+  .toggle-label {
+    font-family:'Share Tech Mono', monospace;
+    font-size:11px;
+    color:var(--text);
+  }
+  .toggle { position:relative; width:34px; height:18px; }
+  .toggle input { display:none; }
+  .toggle-track {
+    position:absolute;
+    inset:0;
+    background:var(--border);
+    border-radius:9px;
+    cursor:pointer;
+    transition:background 0.2s;
+  }
+  .toggle input:checked + .toggle-track { background:var(--accent); }
+  .toggle-track::after {
+    content:'';
+    position:absolute;
+    top:2px; left:2px;
+    width:14px; height:14px;
+    background:#fff;
+    border-radius:50%;
+    transition:transform 0.2s;
+  }
+  .toggle input:checked + .toggle-track::after { transform:translateX(16px); }
+
+  .log-box {
+    font-family:'Share Tech Mono', monospace;
+    font-size:11px;
+    background:#060a12;
+    border:1px solid var(--border);
+    border-radius:4px;
+    padding:8px 10px;
+    height:88px;
+    overflow-y:auto;
+    color:var(--dim);
+    line-height:1.7;
+  }
+  .log-ok   { color:var(--green); }
+  .log-err  { color:var(--accent2); }
+  .log-info { color:var(--accent); }
+
+  .tab-params { display:none; }
+  .tab-params.active { display:block; }
+
+  .guide {
+    font-size:11px;
+    line-height:1.9;
+    color:var(--dim);
+    font-family:'Share Tech Mono', monospace;
+  }
+  .guide .hi { color:var(--accent); }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">
+      <span class="logo-title">VowelSync</span>
+      <span class="logo-sub">VTS PLUGIN v0.2</span>
+    </div>
+    <div class="header-right">
+      <div class="mode-switcher">
+        <button class="mode-btn active" id="btnModeDA"    onclick="setMode('desktop')">🎵 桌面音訊</button>
+        <button class="mode-btn"        id="btnModeVowel" onclick="setMode('vowel')">🎤 母音 AEIOU</button>
+      </div>
+      <div class="status-badge" id="vtsStatus">
+        <div class="status-dot"></div>
+        <span id="vtsStatusText">未連線</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Waveform -->
+  <div class="panel" style="margin-bottom:12px">
+    <div class="panel-title">📊 波形</div>
+    <canvas id="waveCanvas"></canvas>
+  </div>
+
+  <!-- Spectrum -->
+  <div class="panel" style="margin-bottom:12px">
+    <div class="panel-title">🎛️ 頻譜分析</div>
+    <canvas id="specCanvas"></canvas>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-green"   id="btnCapture">▶ 開始捕捉音頻</button>
+    <button class="btn btn-ghost"   id="btnStop" disabled>■ 停止</button>
+    <div class="spacer"></div>
+    <button class="btn btn-primary" id="btnConnect">連接 VTube Studio</button>
+  </div>
+
+  <!-- Desktop Audio mode panel -->
+  <div id="modeDesktop">
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-title">🎵 桌面音訊 — Volume · Frequency · Bass · Mid · High</div>
+      <div class="da-row" id="daRow"></div>
+    </div>
+  </div>
+
+  <!-- Vowel mode panel -->
+  <div id="modeVowel" style="display:none">
+    <div class="panel" style="margin-bottom:12px">
+      <div class="panel-title">🎤 母音辨識 — A · E · I · O · U</div>
+      <div class="vowels-row" id="vowelRow"></div>
+    </div>
+  </div>
+
+  <!-- Bottom grid -->
+  <div class="bottom-grid">
+
+    <!-- LEFT: Connection + Log -->
+    <div class="panel">
+      <div class="panel-title">🔌 VTube Studio 連線</div>
+      <div class="label-sm">WebSocket 地址</div>
+      <input type="text" id="vtsHost" value="ws://localhost:8001" style="margin-bottom:10px">
+      <div class="label-sm">Plugin 名稱</div>
+      <input type="text" id="pluginName" value="VowelSync" style="margin-bottom:12px">
+
+      <div class="toggle-row">
+        <span class="toggle-label">傳送至 VTube Studio</span>
+        <label class="toggle">
+          <input type="checkbox" id="sendToVts">
+          <div class="toggle-track"></div>
+        </label>
+      </div>
+
+      <div class="panel-title" style="margin-top:4px">系統日誌</div>
+      <div class="log-box" id="logBox">
+        <div class="log-info">▶ 等待啟動...</div>
+      </div>
+    </div>
+
+    <!-- RIGHT: Params (tabbed) + Settings -->
+    <div class="panel">
+      <!-- Desktop audio param mappings -->
+      <div class="tab-params active" id="tabDA">
+        <div class="panel-title">🗺️ 參數映射 — 桌面音訊</div>
+        <div id="daParamMappings"></div>
+      </div>
+
+      <!-- Vowel param mappings -->
+      <div class="tab-params" id="tabVowel">
+        <div class="panel-title">🗺️ 參數映射 — 母音</div>
+        <div id="vowelParamMappings"></div>
+      </div>
+
+      <div class="panel-title" style="margin-top:10px">⚙️ 設定</div>
+      <div class="slider-wrap">
+        <span class="slider-label">平滑</span>
+        <input type="range" id="smoothing" min="0" max="0.95" step="0.05" value="0.6">
+        <span class="slider-val" id="smoothVal">0.60</span>
+      </div>
+      <div class="slider-wrap">
+        <span class="slider-label">靈敏度</span>
+        <input type="range" id="sensitivity" min="1" max="10" step="0.5" value="4">
+        <span class="slider-val" id="sensVal">4.0</span>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">靜音門檻過濾</span>
+        <label class="toggle">
+          <input type="checkbox" id="silenceFilter" checked>
+          <div class="toggle-track"></div>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guide -->
+  <div class="panel" style="margin-top:14px; border-color:rgba(0,229,255,0.18)">
+    <div class="panel-title">📖 使用說明</div>
+    <div class="guide">
+      1. VTube Studio → Plugins → 允許第三方插件<br>
+      2. 點「連接 VTube Studio」→ 在 VTS 視窗中允許<br>
+      3. 點「開始捕捉音頻」→ 選擇分頁/桌面，並勾選<span class="hi">「分享音訊」</span><br>
+      4. <span class="hi">桌面音訊模式</span>：音量 / 主頻率 / Bass / Mid / High → 對應 DesktopAudio* 參數<br>
+      5. <span class="hi">母音模式</span>：A/E/I/O/U 共振峰分析 → 適合語音/唱歌口型<br>
+      6. 開啟「傳送至 VTube Studio」即可驅動模型參數<br>
+      <br>
+      <span class="hi">★ 兩組參數可同時存在 VTS，隨時切換模式無需重新連線</span>
+    </div>
+  </div>
+
+</div><!-- /app -->
+<script>
+// ══════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════
+const VOWELS = ['A','E','I','O','U'];
+const VOWEL_COLORS = { A:'#ff4081', E:'#ffd740', I:'#00e5ff', O:'#aa44ff', U:'#00ff88' };
+
+const VOWEL_FORMANTS = {
+  A: { f1:[700,900],  f2:[1000,1400] },
+  E: { f1:[350,550],  f2:[1900,2500] },
+  I: { f1:[250,380],  f2:[2200,3000] },
+  O: { f1:[400,600],  f2:[700,1100]  },
+  U: { f1:[250,380],  f2:[600,900]   },
+};
+
+const DA_ITEMS = [
+  { id:'vol',  label:'VOLUME',    color:'#00e5ff', def:'DesktopAudioVolume'    },
+  { id:'freq', label:'FREQUENCY', color:'#ffd740', def:'DesktopAudioFrequency' },
+  { id:'bass', label:'BASS',      color:'#ff4081', def:'DesktopAudioBass'      },
+  { id:'mid',  label:'MID',       color:'#aa44ff', def:'DesktopAudioMid'       },
+  { id:'high', label:'HIGH',      color:'#00ff88', def:'DesktopAudioHigh'      },
+];
+
+const BAND_RANGES = {
+  bass: [20,   250],
+  mid:  [250,  4000],
+  high: [4000, 20000],
+};
+
+let currentMode = 'desktop';
+let audioCtx = null, analyser = null, stream = null, animFrameId = null;
+let ws = null, authToken = '';
+
+let smoothedDA    = { vol:0, freq:0, bass:0, mid:0, high:0 };
+let smoothedVowel = { A:0, E:0, I:0, O:0, U:0 };
+let daParamNames    = Object.fromEntries(DA_ITEMS.map(d=>[d.id,d.def]));
+let vowelParamNames = { A:'VowelA', E:'VowelE', I:'VowelI', O:'VowelO', U:'VowelU' };
+
+// ══════════════════════════════════════════════════════
+//  MODE SWITCH
+// ══════════════════════════════════════════════════════
+function setMode(mode) {
+  currentMode = mode;
+  const isDA = mode === 'desktop';
+  document.getElementById('modeDesktop').style.display = isDA ? 'block' : 'none';
+  document.getElementById('modeVowel').style.display   = isDA ? 'none'  : 'block';
+  document.getElementById('btnModeDA').classList.toggle('active', isDA);
+  document.getElementById('btnModeVowel').classList.toggle('active', !isDA);
+  document.getElementById('tabDA').classList.toggle('active', isDA);
+  document.getElementById('tabVowel').classList.toggle('active', !isDA);
+  log(`切換 → ${isDA ? '桌面音訊模式' : '母音 AEIOU 模式'}`, 'log-info');
+}
+
+// ══════════════════════════════════════════════════════
+//  BUILD UI
+// ══════════════════════════════════════════════════════
+(function buildUI() {
+  // Desktop audio cards
+  const daRow = document.getElementById('daRow');
+  DA_ITEMS.forEach(d => {
+    const c = document.createElement('div');
+    c.className = 'da-card'; c.dataset.da = d.id; c.id = `daCard-${d.id}`;
+    c.innerHTML = `
+      <div class="da-label">${d.label}</div>
+      <div class="da-value" id="daVal-${d.id}" style="color:${d.color}">0.00</div>
+      <div class="da-bar-wrap"><div class="da-bar" id="daBar-${d.id}" style="background:${d.color}"></div></div>
+      <div class="da-param-name" id="daPN-${d.id}">${d.def}</div>`;
+    daRow.appendChild(c);
+  });
+
+  // DA param mappings
+  const daMap = document.getElementById('daParamMappings');
+  DA_ITEMS.forEach(d => {
+    const row = document.createElement('div'); row.className = 'param-row';
+    row.innerHTML = `<div class="tag" data-da="${d.id}">${d.label.slice(0,4)}</div>
+      <input type="text" id="daparam-${d.id}" value="${d.def}" placeholder="VTS 參數名稱">`;
+    daMap.appendChild(row);
+    setTimeout(() => {
+      const inp = document.getElementById(`daparam-${d.id}`);
+      if (inp) inp.addEventListener('input', e => {
+        daParamNames[d.id] = e.target.value;
+        const pn = document.getElementById(`daPN-${d.id}`);
+        if (pn) pn.textContent = e.target.value;
+      });
+    }, 0);
+  });
+
+  // Vowel cards
+  const vRow = document.getElementById('vowelRow');
+  VOWELS.forEach(v => {
+    const c = document.createElement('div');
+    c.className = 'vowel-card'; c.dataset.v = v; c.id = `vCard-${v}`;
+    c.innerHTML = `
+      <div class="vowel-letter" style="color:${VOWEL_COLORS[v]}">${v}</div>
+      <div class="vowel-bar-wrap"><div class="vowel-bar" id="vBar-${v}" style="background:${VOWEL_COLORS[v]}"></div></div>
+      <div class="vowel-value" id="vVal-${v}" style="color:${VOWEL_COLORS[v]}">0.00</div>`;
+    vRow.appendChild(c);
+  });
+
+  // Vowel param mappings
+  const vMap = document.getElementById('vowelParamMappings');
+  VOWELS.forEach(v => {
+    const row = document.createElement('div'); row.className = 'param-row';
+    row.innerHTML = `<div class="tag" data-v="${v}">${v}</div>
+      <input type="text" id="vparam-${v}" value="${vowelParamNames[v]}" placeholder="VTS 參數名稱">`;
+    vMap.appendChild(row);
+    setTimeout(() => {
+      const inp = document.getElementById(`vparam-${v}`);
+      if (inp) inp.addEventListener('input', e => { vowelParamNames[v] = e.target.value; });
+    }, 0);
+  });
+})();
+
+// ══════════════════════════════════════════════════════
+//  LOG
+// ══════════════════════════════════════════════════════
+function log(msg, cls='') {
+  const box = document.getElementById('logBox');
+  const div = document.createElement('div'); div.className = cls;
+  const ts = new Date().toLocaleTimeString('zh-TW',{hour12:false});
+  div.textContent = `[${ts}] ${msg}`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ══════════════════════════════════════════════════════
+//  CANVAS
+// ══════════════════════════════════════════════════════
+const waveCanvas = document.getElementById('waveCanvas');
+const waveCtx    = waveCanvas.getContext('2d');
+const specCanvas = document.getElementById('specCanvas');
+const specCtx    = specCanvas.getContext('2d');
+
+function resizeCanvases() {
+  [waveCanvas,specCanvas].forEach(c=>{
+    c.width  = c.offsetWidth  * window.devicePixelRatio;
+    c.height = c.offsetHeight * window.devicePixelRatio;
+  });
+}
+resizeCanvases();
+window.addEventListener('resize', resizeCanvases);
+
+// ══════════════════════════════════════════════════════
+//  AUDIO CAPTURE
+// ══════════════════════════════════════════════════════
+document.getElementById('btnCapture').addEventListener('click', async () => {
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video:{width:1,height:1},
+        audio:{echoCancellation:false,noiseSuppression:false,sampleRate:44100}
+      });
+      log('桌面音頻捕捉成功（請確認已勾選「分享音訊」）','log-ok');
+    } catch(e) {
+      stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});
+      log('已切換使用麥克風','log-info');
+    }
+    const source = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.2;
+    source.connect(analyser);
+    document.getElementById('btnCapture').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+    log('開始音頻分析','log-ok');
+    drawLoop();
+  } catch(e) { log('錯誤: '+e.message,'log-err'); }
+});
+
+document.getElementById('btnStop').addEventListener('click', () => {
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  if (stream) stream.getTracks().forEach(t=>t.stop());
+  if (audioCtx) audioCtx.close();
+  analyser = null;
+  document.getElementById('btnCapture').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  log('已停止','log-info');
+});
+
+// ══════════════════════════════════════════════════════
+//  ANALYSIS HELPERS
+// ══════════════════════════════════════════════════════
+function getSmoothing()   { return parseFloat(document.getElementById('smoothing').value); }
+function getSensitivity() { return parseFloat(document.getElementById('sensitivity').value); }
+
+function rangeEnergy(fd, sr, bl, lo, hi) {
+  const blo = Math.max(0, Math.round(lo/(sr/bl)));
+  const bhi = Math.min(fd.length-1, Math.round(hi/(sr/bl)));
+  let sum=0, cnt=0;
+  for (let i=blo;i<=bhi;i++){sum+=fd[i];cnt++;}
+  return cnt?sum/cnt:0;
+}
+
+function analyzeDA(fd, sr, bl) {
+  const sm=getSmoothing(), sens=getSensitivity();
+  const vol = rangeEnergy(fd,sr,bl,20,20000);
+  const silence = document.getElementById('silenceFilter').checked && vol<4;
+
+  const bass = rangeEnergy(fd,sr,bl,...BAND_RANGES.bass);
+  const mid  = rangeEnergy(fd,sr,bl,...BAND_RANGES.mid);
+  const high = rangeEnergy(fd,sr,bl,...BAND_RANGES.high);
+
+  // Spectral centroid → dominant freq
+  const nyq = sr/2;
+  let wSum=0, tMag=0;
+  for(let i=0;i<fd.length;i++){wSum+=fd[i]*(i/fd.length*nyq);tMag+=fd[i];}
+  const domFreq = tMag>0?wSum/tMag:0;
+  const freqNorm = Math.min(domFreq/8000,1);
+
+  const raw = {
+    vol:  Math.min(vol /255*sens*0.5,1),
+    freq: silence?0:freqNorm,
+    bass: Math.min(bass/255*sens*0.6,1),
+    mid:  Math.min(mid /255*sens*0.5,1),
+    high: Math.min(high/255*sens*0.8,1),
+  };
+
+  Object.keys(raw).forEach(k=>{
+    const v = silence?0:raw[k];
+    smoothedDA[k] = smoothedDA[k]*sm + v*(1-sm);
+  });
+  return smoothedDA;
+}
+
+function analyzeVowels(fd, sr, bl) {
+  const sm=getSmoothing(), sens=getSensitivity();
+  const total = rangeEnergy(fd,sr,bl,80,4000);
+  const silence = document.getElementById('silenceFilter').checked && total<4;
+  const raw={};
+  VOWELS.forEach(v=>{
+    const fm=VOWEL_FORMANTS[v];
+    raw[v] = rangeEnergy(fd,sr,bl,fm.f1[0],fm.f1[1])*0.6
+           + rangeEnergy(fd,sr,bl,fm.f2[0],fm.f2[1])*0.4;
+  });
+  const maxRaw=Math.max(...Object.values(raw),1);
+  VOWELS.forEach(v=>{
+    let n=silence?0:Math.min(raw[v]/maxRaw*sens*0.2,1);
+    smoothedVowel[v]=smoothedVowel[v]*sm+n*(1-sm);
+  });
+  return smoothedVowel;
+}
+
+// ══════════════════════════════════════════════════════
+//  DRAW LOOP
+// ══════════════════════════════════════════════════════
+function drawLoop() {
+  if (!analyser) return;
+  const bl = analyser.frequencyBinCount;
+  const td = new Uint8Array(bl), fd = new Uint8Array(bl);
+  analyser.getByteTimeDomainData(td);
+  analyser.getByteFrequencyData(fd);
+  const sr = audioCtx.sampleRate;
+  const nyq = sr/2;
+  const dpr = window.devicePixelRatio;
+
+  const W=waveCanvas.width, H=waveCanvas.height;
+  const SW=specCanvas.width, SH=specCanvas.height;
+
+  // Waveform
+  waveCtx.fillStyle='#060a12'; waveCtx.fillRect(0,0,W,H);
+  waveCtx.beginPath();
+  waveCtx.strokeStyle = currentMode==='desktop'?'#00e5ff':'#ff4081';
+  waveCtx.lineWidth=1.5*dpr;
+  const sw=W/bl; let x=0;
+  for(let i=0;i<bl;i++){
+    const v=td[i]/128; const y=v*H/2;
+    i===0?waveCtx.moveTo(x,y):waveCtx.lineTo(x,y);
+    x+=sw;
+  }
+  waveCtx.stroke();
+
+  // Spectrum
+  specCtx.fillStyle='#060a12'; specCtx.fillRect(0,0,SW,SH);
+  function fX(f){return(f/nyq)*SW;}
+
+  if(currentMode==='desktop'){
+    // Band highlight zones
+    [{r:BAND_RANGES.bass,c:'#ff408118'},{r:BAND_RANGES.mid,c:'#aa44ff14'},{r:BAND_RANGES.high,c:'#00ff8814'}].forEach(z=>{
+      specCtx.fillStyle=z.c;
+      specCtx.fillRect(fX(z.r[0]),0,fX(z.r[1])-fX(z.r[0]),SH);
+    });
+    // Active band glow based on smoothed values
+    const glowItems=[{r:BAND_RANGES.bass,c:'#ff4081',k:'bass'},{r:BAND_RANGES.mid,c:'#aa44ff',k:'mid'},{r:BAND_RANGES.high,c:'#00ff88',k:'high'}];
+    glowItems.forEach(g=>{
+      const a=Math.min(smoothedDA[g.k]*0.5,0.35);
+      if(a>0.02){
+        specCtx.fillStyle=g.c; specCtx.globalAlpha=a;
+        specCtx.fillRect(fX(g.r[0]),0,fX(g.r[1])-fX(g.r[0]),SH);
+        specCtx.globalAlpha=1;
+      }
+    });
+    // Labels
+    specCtx.font=`${8.5*dpr}px Share Tech Mono,monospace`;
+    specCtx.fillStyle='#4a6080';
+    specCtx.fillText('BASS',fX(30)+3,SH-3);
+    specCtx.fillText('MID',fX(260)+3,SH-3);
+    specCtx.fillText('HIGH',fX(4100)+3,SH-3);
+  } else {
+    VOWELS.forEach(v=>{
+      const fm=VOWEL_FORMANTS[v];
+      const a=Math.min(smoothedVowel[v]*2,0.35)+0.04;
+      specCtx.fillStyle=VOWEL_COLORS[v]; specCtx.globalAlpha=a;
+      specCtx.fillRect(fX(fm.f1[0]),0,fX(fm.f1[1])-fX(fm.f1[0]),SH);
+      specCtx.fillRect(fX(fm.f2[0]),0,fX(fm.f2[1])-fX(fm.f2[0]),SH);
+      specCtx.globalAlpha=1;
+    });
+  }
+
+  // Freq bars
+  const bw=SW/(bl/2);
+  for(let i=0;i<bl/2;i++){
+    const val=fd[i]/255, bh=val*SH;
+    const freq=i*nyq/(bl/2);
+    let col;
+    if(currentMode==='desktop')
+      col=freq<250?'#ff408166':freq<4000?'#aa44ff55':'#00ff8855';
+    else
+      col=freq<1000?'#0066ff55':freq<3000?'#00e5ff55':'#ff408155';
+    specCtx.fillStyle=col;
+    specCtx.fillRect(i*bw,SH-bh,bw,bh);
+  }
+
+  // Update cards & send
+  if(currentMode==='desktop'){
+    const da=analyzeDA(fd,sr,bl);
+    DA_ITEMS.forEach(d=>{
+      const v=da[d.id];
+      document.getElementById(`daBar-${d.id}`).style.height=(v*100).toFixed(1)+'%';
+      document.getElementById(`daVal-${d.id}`).textContent=v.toFixed(2);
+      document.getElementById(`daCard-${d.id}`).classList.toggle('active',v>0.12);
+    });
+    if(document.getElementById('sendToVts').checked && ws?.readyState===WebSocket.OPEN) sendVtsDA(da);
+  } else {
+    const sv=analyzeVowels(fd,sr,bl);
+    VOWELS.forEach(v=>{
+      const val=sv[v];
+      document.getElementById(`vBar-${v}`).style.height=(val*100).toFixed(1)+'%';
+      document.getElementById(`vVal-${v}`).textContent=val.toFixed(2);
+      document.getElementById(`vCard-${v}`).classList.toggle('active',val>0.22);
+    });
+    if(document.getElementById('sendToVts').checked && ws?.readyState===WebSocket.OPEN) sendVtsVowel(sv);
+  }
+
+  animFrameId=requestAnimationFrame(drawLoop);
+}
+
+// ══════════════════════════════════════════════════════
+//  VTube Studio WebSocket
+// ══════════════════════════════════════════════════════
+document.getElementById('btnConnect').addEventListener('click', connectVts);
+
+function connectVts() {
+  const host=document.getElementById('vtsHost').value;
+  const name=document.getElementById('pluginName').value;
+  if(ws) ws.close();
+  ws=new WebSocket(host);
+  ws.onopen=()=>{
+    log('已連接 VTS WebSocket','log-ok');
+    ws.send(JSON.stringify({apiName:'VTubeStudioPublicAPI',apiVersion:'1.0',requestID:'ping',messageType:'APIStateRequest'}));
+  };
+  ws.onmessage=(e)=>{
+    const msg=JSON.parse(e.data);
+    if(msg.messageType==='APIStateResponse'){
+      log('VTS API 就緒，請求認證...','log-info');
+      ws.send(JSON.stringify({apiName:'VTubeStudioPublicAPI',apiVersion:'1.0',requestID:'authToken',
+        messageType:'AuthenticationTokenRequest',
+        data:{pluginName:name,pluginDeveloper:'VowelSync',pluginIcon:''}}));
+    } else if(msg.messageType==='AuthenticationTokenResponse'){
+      authToken=msg.data.authenticationToken;
+      log('已取得 Token，認證中...','log-info');
+      ws.send(JSON.stringify({apiName:'VTubeStudioPublicAPI',apiVersion:'1.0',requestID:'auth',
+        messageType:'AuthenticationRequest',
+        data:{pluginName:name,pluginDeveloper:'VowelSync',authenticationToken:authToken}}));
+    } else if(msg.messageType==='AuthenticationResponse'){
+      if(msg.data.authenticated){
+        log('✓ VTube Studio 認證成功！','log-ok');
+        document.getElementById('vtsStatus').classList.add('connected');
+        document.getElementById('vtsStatusText').textContent='已連線';
+        ensureAllParams(name);
+      } else { log('✗ 認證失敗: '+msg.data.reason,'log-err'); }
+    } else if(msg.data?.errorID){
+      log('VTS 錯誤 '+msg.data.errorID+': '+msg.data.message,'log-err');
+    }
+  };
+  ws.onclose=()=>{
+    log('VTS 連線斷開','log-err');
+    document.getElementById('vtsStatus').classList.remove('connected');
+    document.getElementById('vtsStatusText').textContent='未連線';
+  };
+  ws.onerror=()=>log('WebSocket 錯誤','log-err');
+}
+
+function ensureAllParams(name) {
+  let delay=0;
+  const all=[
+    ...DA_ITEMS.map(d=>({n:daParamNames[d.id],   ex:`Desktop audio ${d.label} — VowelSync`})),
+    ...VOWELS.map(v=>({n:vowelParamNames[v],      ex:`Vowel ${v} formant — VowelSync`})),
+  ];
+  all.forEach(p=>{
+    setTimeout(()=>{
+      ws.send(JSON.stringify({apiName:'VTubeStudioPublicAPI',apiVersion:'1.0',
+        requestID:`cp_${p.n}`,messageType:'ParameterCreationRequest',
+        data:{parameterName:p.n,explanation:p.ex,min:0,max:1,defaultValue:0}}));
+    }, delay);
+    delay+=100;
+  });
+  log(`已建立 ${all.length} 個 VTS 參數（桌面音訊 5 + 母音 5）`,'log-ok');
+}
+
+function injectParams(reqID, paramValues) {
+  ws.send(JSON.stringify({
+    apiName:'VTubeStudioPublicAPI',apiVersion:'1.0',
+    requestID:reqID,messageType:'InjectParameterDataRequest',
+    data:{faceFound:false,mode:'set',parameterValues}
+  }));
+}
+
+function sendVtsDA(da) {
+  injectParams('injectDA', DA_ITEMS.map(d=>({id:daParamNames[d.id],value:parseFloat(da[d.id].toFixed(4))})));
+}
+function sendVtsVowel(sv) {
+  injectParams('injectVowels', VOWELS.map(v=>({id:vowelParamNames[v],value:parseFloat(sv[v].toFixed(4))})));
+}
+
+// ══════════════════════════════════════════════════════
+//  SLIDER DISPLAY
+// ══════════════════════════════════════════════════════
+document.getElementById('smoothing').addEventListener('input',e=>{
+  document.getElementById('smoothVal').textContent=parseFloat(e.target.value).toFixed(2);
+});
+document.getElementById('sensitivity').addEventListener('input',e=>{
+  document.getElementById('sensVal').textContent=parseFloat(e.target.value).toFixed(1);
+});
+</script>
+</body>
+</html>
