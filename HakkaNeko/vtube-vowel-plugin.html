@@ -820,14 +820,16 @@
     <div class="guide">
       1. VTube Studio → Plugins → 允許第三方插件<br>
       2. 點「連接 VTube Studio」→ 在 VTS 視窗中允許<br>
-      3. 點「開始捕捉音頻」→ 選擇分頁/桌面，並勾選<span class="hi">「分享音訊」</span><br>
+      3. 點「開始捕捉音頻」→ 選擇分頁/桌面，並勾選<span class="hi">「分享音訊」(Share audio)</span><br>
       4. <span class="hi">桌面音訊模式</span>：音量 / 主頻率 / Bass / Mid / High → 對應 DesktopAudio* 參數<br>
       5. <span class="hi">母音模式</span>：A/E/I/O/U 共振峰分析 → 適合語音/唱歌口型<br>
       6. 開啟「傳送至 VTube Studio」即可驅動模型參數<br>
       <br>
+      <span class="badge">🔒 Permission denied</span> 點網址列左側 🔒 → 麥克風 → <span class="hi">允許</span> → 重新整理。或前往 <span class="hi">chrome://settings/content/microphone</span> 手動允許此網站<br>
+      <br>
       <span class="badge">⚠️ 錯誤 352</span> 若發生參數衝突，請點左側「<span class="hi">刪除並重建</span>」按鈕，或在 VTS 內手動刪除舊的自訂參數<br>
       <br>
-      <span class="hi">★ 兩組參數可同時存在 VTS，隨時切換模式無需重新連線</span>
+      <span class="hi">★ 建議使用 Chrome 瀏覽器（Firefox 不支援桌面音訊捕捉）</span>
     </div>
   </div>
 
@@ -1039,16 +1041,55 @@ window.addEventListener('resize', resizeCanvases);
 document.getElementById('btnCapture').addEventListener('click', async () => {
   try {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // 先嘗試桌面/分頁音訊捕捉
     try {
       stream = await navigator.mediaDevices.getDisplayMedia({
-        video:{width:1,height:1},
-        audio:{echoCancellation:false,noiseSuppression:false,sampleRate:44100}
+        video: { width:1, height:1 },
+        audio: { echoCancellation:false, noiseSuppression:false, sampleRate:44100 }
       });
-      log('桌面音頻捕捉成功（請確認已勾選「分享音訊」）','log-ok');
+
+      // 確認有拿到音訊 track，沒有就代表使用者沒勾「分享音訊」
+      const audioTracks = stream.getAudioTracks();
+      if (audioTracks.length === 0) {
+        stream.getTracks().forEach(t => t.stop());
+        throw new Error('NO_AUDIO_TRACK');
+      }
+      log('✓ 桌面/分頁音訊捕捉成功', 'log-ok');
+
     } catch(e) {
-      stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});
-      log('已切換使用麥克風','log-info');
+      // 根據錯誤種類給出不同提示
+      if (e.message === 'NO_AUDIO_TRACK') {
+        log('⚠️ 未偵測到音訊！請在分享視窗中勾選「分享音訊」(Share audio)', 'log-warn');
+        log('↩ 備援：改用麥克風輸入...', 'log-info');
+      } else if (e.name === 'NotAllowedError' || e.message.includes('Permission denied') || e.message.includes('permission')) {
+        log('⚠️ 桌面音訊被拒絕，備援改用麥克風...', 'log-warn');
+        log('💡 如需桌面音訊：點網址列🔒 → 允許音效/麥克風', 'log-info');
+      } else if (e.name === 'NotSupportedError') {
+        log('⚠️ 此瀏覽器不支援桌面音訊（建議用 Chrome），備援改用麥克風', 'log-warn');
+      } else {
+        log(`⚠️ 桌面音訊失敗(${e.name})，備援改用麥克風...`, 'log-warn');
+      }
+
+      // 備援：改用麥克風
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation:false, noiseSuppression:false }
+        });
+        log('✓ 麥克風捕捉成功', 'log-ok');
+      } catch(e2) {
+        if (e2.name === 'NotAllowedError' || e2.message.includes('Permission denied')) {
+          log('✗ 麥克風權限也被拒絕！', 'log-err');
+          log('🔧 解法：點網址列左側🔒 → 麥克風 → 允許 → 重新整理頁面', 'log-err');
+          log('🔧 或到 chrome://settings/content/microphone 手動允許此網站', 'log-err');
+        } else {
+          log('✗ 麥克風錯誤：' + e2.message, 'log-err');
+        }
+        if (audioCtx) { audioCtx.close(); audioCtx = null; }
+        return;
+      }
     }
+
     const source = audioCtx.createMediaStreamSource(stream);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
@@ -1056,10 +1097,13 @@ document.getElementById('btnCapture').addEventListener('click', async () => {
     source.connect(analyser);
     document.getElementById('btnCapture').disabled = true;
     document.getElementById('btnStop').disabled = false;
-    log('開始音頻分析','log-ok');
+    log('🎵 開始音頻分析', 'log-ok');
     drawLoop();
-    startVtsLoop(); // ★ 獨立的 VTS 傳送迴圈，背景也能運作
-  } catch(e) { log('錯誤: '+e.message,'log-err'); }
+    startVtsLoop();
+  } catch(e) {
+    log('✗ 未知錯誤：' + e.message, 'log-err');
+    if (audioCtx) { audioCtx.close(); audioCtx = null; }
+  }
 });
 
 document.getElementById('btnStop').addEventListener('click', () => {
