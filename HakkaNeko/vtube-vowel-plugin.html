@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VowelSync — VTube Studio Plugin</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+  :root {
+    /* 阿卡貓風格：深紫黑 + 霓虹紫粉 */
+    --bg: #0a0814;
+    --bg2: #100c1e;
+    --panel: #14102a;
+    --panel2: #1a1535;
+    --border: #2a2050;
+    --border-glow: #6b4fa8;
+    --accent: #c084fc;      /* 粉紫 */
+    --accent2: #f472b6;     /* 粉紅 */
+    --accent3: #818cf8;     /* 靛紫 */
+    --green: #34d399;
+    --yellow: #fbbf24;
+    --text: #e2d9f3;
+    --text2: #a89bc8;
+    --dim: #5a4f7a;
+
+    --a-color: #f472b6;
+    --e-color: #fbbf24;
+    --i-color: #818cf8;
+    --o-color: #c084fc;
+    --u-color: #34d399;
+
+    --vol-color: #818cf8;
+    --freq-color: #fbbf24;
+    --bass-color: #f472b6;
+    --mid-color: #c084fc;
+    --high-color: #34d399;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Noto Sans TC', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+  }
+
+  /* 背景星點效果 */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      radial-gradient(ellipse 60% 40% at 20% 10%, rgba(192,132,252,0.08) 0%, transparent 60%),
+      radial-gradient(ellipse 40% 30% at 80% 80%, rgba(244,114,182,0.06) 0%, transparent 60%),
+      radial-gradient(circle at 50% 50%, rgba(129,140,248,0.03) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* 細格線 */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(107,79,168,0.06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(107,79,168,0.06) 1px, transparent 1px);
+    background-size: 36px 36px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 1000px;
+    margin: 0 auto;
+    padding: 20px 20px;
+    width: 100%;
+  }
+
+  /* ── Header ── */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .logo { display: flex; align-items: center; gap: 12px; }
+
+  .logo-icon {
+    width: 36px; height: 36px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 0 16px rgba(192,132,252,0.4);
+  }
+
+  .logo-text { display: flex; flex-direction: column; gap: 1px; }
+
+  .logo-title {
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .logo-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--dim);
+    letter-spacing: 0.18em;
+  }
+
+  .header-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+  /* ── Mode Switcher ── */
+  .mode-switcher {
+    display: flex;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    padding: 3px;
+    gap: 3px;
+  }
+  .mode-btn {
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 500;
+    font-size: 12px;
+    padding: 6px 14px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--dim);
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .mode-btn.active {
+    background: linear-gradient(135deg, rgba(192,132,252,0.25), rgba(244,114,182,0.15));
+    color: var(--accent);
+    border: 1px solid rgba(192,132,252,0.35);
+    box-shadow: 0 0 10px rgba(192,132,252,0.15);
+  }
+  .mode-btn:not(.active):hover { color: var(--text2); }
+
+  /* ── Status Badge ── */
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--panel);
+    color: var(--dim);
+    transition: all 0.3s;
+  }
+  .status-badge.connected { border-color: var(--green); color: var(--green); background: rgba(52,211,153,0.07); }
+  .status-dot { width:7px; height:7px; border-radius:50%; background:var(--dim); transition:all 0.3s; flex-shrink:0; }
+  .status-badge.connected .status-dot { background:var(--green); box-shadow:0 0 8px var(--green); animation:blink 1.5s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+  /* ── Panel ── */
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+    transition: border-color 0.3s;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    color: var(--text2);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  canvas { width:100%; border-radius:6px; display:block; }
+  #waveCanvas { height:60px; background:#08061a; }
+  #specCanvas { height:100px; background:#08061a; }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex;
+    gap: 8px;
+    margin: 14px 0;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .spacer { flex:1; }
+
+  .btn {
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 500;
+    font-size: 13px;
+    padding: 9px 18px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn-green {
+    background: linear-gradient(135deg, rgba(52,211,153,0.2), rgba(52,211,153,0.1));
+    border: 1px solid rgba(52,211,153,0.5);
+    color: var(--green);
+  }
+  .btn-green:hover:not(:disabled) { box-shadow:0 0 18px rgba(52,211,153,0.3); border-color: var(--green); }
+  .btn-primary {
+    background: linear-gradient(135deg, rgba(192,132,252,0.25), rgba(244,114,182,0.15));
+    border: 1px solid rgba(192,132,252,0.45);
+    color: var(--accent);
+  }
+  .btn-primary:hover:not(:disabled) { box-shadow:0 0 18px rgba(192,132,252,0.3); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text2);
+  }
+  .btn-ghost:hover:not(:disabled) { border-color:var(--accent); color:var(--accent); }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Desktop Audio Cards ── */
+  .da-row { display:flex; gap:8px; }
+
+  .da-card {
+    flex:1;
+    background: var(--bg2);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:12px 8px;
+    text-align:center;
+    transition:border-color 0.2s, box-shadow 0.2s;
+    position:relative;
+    overflow:hidden;
+  }
+  .da-card[data-da="vol"]  { --dc:var(--vol-color); }
+  .da-card[data-da="freq"] { --dc:var(--freq-color); }
+  .da-card[data-da="bass"] { --dc:var(--bass-color); }
+  .da-card[data-da="mid"]  { --dc:var(--mid-color); }
+  .da-card[data-da="high"] { --dc:var(--high-color); }
+
+  .da-card.active { border-color:var(--dc); box-shadow: 0 0 14px rgba(var(--dc),0.2); }
+  .da-card.active::after {
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:10px;
+    box-shadow:0 0 20px var(--dc) inset;
+    pointer-events:none;
+    opacity: 0.35;
+  }
+
+  .da-label {
+    font-size:8px;
+    font-weight: 600;
+    letter-spacing:0.15em;
+    color:var(--dc);
+    margin-bottom:5px;
+    opacity:0.9;
+  }
+  .da-value {
+    font-size:18px;
+    font-weight:700;
+    color:var(--dc);
+    line-height:1;
+    margin-bottom:5px;
+    font-variant-numeric:tabular-nums;
+    font-family: 'Share Tech Mono', monospace;
+  }
+  .da-bar-wrap {
+    height:44px;
+    background:#060412;
+    border-radius:4px;
+    overflow:hidden;
+    display:flex;
+    align-items:flex-end;
+  }
+  .da-bar {
+    width:100%;
+    background:var(--dc);
+    border-radius:2px;
+    transition:height 0.07s ease-out;
+    opacity:0.7;
+    height:0%;
+  }
+  .da-param-name {
+    font-family:'Share Tech Mono', monospace;
+    font-size:7px;
+    color:var(--dim);
+    margin-top:5px;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
+
+  /* ── Vowel Cards ── */
+  .vowels-row { display:flex; gap:8px; }
+
+  .vowel-card {
+    flex:1;
+    background: var(--bg2);
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:14px 8px;
+    text-align:center;
+    position:relative;
+    overflow:hidden;
+    transition:border-color 0.15s, box-shadow 0.15s;
+  }
+  .vowel-card[data-v="A"] { --vc:var(--a-color); }
+  .vowel-card[data-v="E"] { --vc:var(--e-color); }
+  .vowel-card[data-v="I"] { --vc:var(--i-color); }
+  .vowel-card[data-v="O"] { --vc:var(--o-color); }
+  .vowel-card[data-v="U"] { --vc:var(--u-color); }
+  .vowel-card.active { border-color:var(--vc); box-shadow: 0 0 16px rgba(var(--vc),0.15); }
+  .vowel-card.active::after {
+    content:'';
+    position:absolute;
+    inset:0;
+    border-radius:10px;
+    box-shadow:0 0 22px var(--vc) inset;
+    pointer-events:none;
+    opacity:0.3;
+  }
+  .vowel-letter {
+    font-size:30px;
+    font-weight:700;
+    line-height:1;
+    margin-bottom:7px;
+    color:var(--vc);
+    text-shadow:0 0 16px var(--vc);
+  }
+  .vowel-bar-wrap {
+    height:48px;
+    background:#060412;
+    border-radius:4px;
+    margin:7px 0;
+    overflow:hidden;
+    display:flex;
+    align-items:flex-end;
+  }
+  .vowel-bar {
+    width:100%;
+    background:var(--vc);
+    border-radius:2px;
+    transition:height 0.08s ease-out;
+    opacity:0.8;
+    height:0%;
+  }
+  .vowel-value {
+    font-family:'Share Tech Mono', monospace;
+    font-size:11px;
+    color:var(--vc);
+    opacity:0.8;
+  }
+
+  /* ── Bottom Grid ── */
+  .bottom-grid {
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:12px;
+    margin-top:12px;
+  }
+
+  input[type="text"] {
+    background: var(--bg2);
+    border:1px solid var(--border);
+    border-radius:6px;
+    color:var(--text);
+    font-family:'Share Tech Mono', monospace;
+    font-size:12px;
+    padding:8px 10px;
+    outline:none;
+    transition:border-color 0.2s;
+    width:100%;
+  }
+  input:focus { border-color:var(--accent); box-shadow: 0 0 8px rgba(192,132,252,0.2); }
+
+  .label-sm {
+    font-size:10px;
+    font-weight: 600;
+    color:var(--text2);
+    margin-bottom:4px;
+    letter-spacing:0.08em;
+  }
+
+  .param-row {
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:6px;
+  }
+
+  .tag {
+    width:34px; height:26px;
+    border-radius:6px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    font-weight:700;
+    font-size:10px;
+    flex-shrink:0;
+    letter-spacing:0.03em;
+  }
+  .tag[data-v="A"] { background:rgba(244,114,182,0.15); color:var(--a-color); font-size:14px; }
+  .tag[data-v="E"] { background:rgba(251,191,36,0.15);  color:var(--e-color); font-size:14px; }
+  .tag[data-v="I"] { background:rgba(129,140,248,0.15); color:var(--i-color); font-size:14px; }
+  .tag[data-v="O"] { background:rgba(192,132,252,0.15); color:var(--o-color); font-size:14px; }
+  .tag[data-v="U"] { background:rgba(52,211,153,0.15);  color:var(--u-color); font-size:14px; }
+  .tag[data-da="vol"]  { background:rgba(129,140,248,0.12); color:var(--vol-color); }
+  .tag[data-da="freq"] { background:rgba(251,191,36,0.12);  color:var(--freq-color); }
+  .tag[data-da="bass"] { background:rgba(244,114,182,0.12); color:var(--bass-color); }
+  .tag[data-da="mid"]  { background:rgba(192,132,252,0.12); color:var(--mid-color); }
+  .tag[data-da="high"] { background:rgba(52,211,153,0.12);  color:var(--high-color); }
+
+  .slider-wrap {
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:8px;
+  }
+  .slider-label {
+    font-size:11px;
+    color:var(--text2);
+    width:52px;
+    flex-shrink:0;
+  }
+  input[type="range"] {
+    flex:1;
+    -webkit-appearance:none;
+    height:3px;
+    background:var(--border);
+    border-radius:2px;
+    outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance:none;
+    width:13px; height:13px;
+    border-radius:50%;
+    background:var(--accent);
+    cursor:pointer;
+    box-shadow:0 0 6px var(--accent);
+  }
+  .slider-val {
+    font-family:'Share Tech Mono', monospace;
+    font-size:11px;
+    color:var(--accent);
+    width:32px;
+    text-align:right;
+  }
+
+  .toggle-row {
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    margin-bottom:8px;
+  }
+  .toggle-label {
+    font-size:12px;
+    color:var(--text);
+  }
+  .toggle { position:relative; width:34px; height:18px; }
+  .toggle input { display:none; }
+  .toggle-track {
+    position:absolute;
+    inset:0;
+    background:var(--border);
+    border-radius:9px;
+    cursor:pointer;
+    transition:background 0.2s;
+  }
+  .toggle input:checked + .toggle-track { background:var(--accent); }
+  .toggle-track::after {
+    content:'';
+    position:absolute;
+    top:2px; left:2px;
+    width:14px; height:14px;
+    background:#fff;
+    border-radius:50%;
+    transition:transform 0.2s;
+  }
+  .toggle input:checked + .toggle-track::after { transform:translateX(16px); }
+
+  .log-box {
+    font-family:'Share Tech Mono', monospace;
+    font-size:11px;
+    background: var(--bg2);
+    border:1px solid var(--border);
+    border-radius:6px;
+    padding:8px 10px;
+    height:90px;
+    overflow-y:auto;
+    color:var(--dim);
+    line-height:1.7;
+  }
+  .log-ok   { color:var(--green); }
+  .log-err  { color:var(--accent2); }
+  .log-info { color:var(--accent); }
+  .log-warn { color:var(--yellow); }
+
+  .tab-params { display:none; }
+  .tab-params.active { display:block; }
+
+  .guide {
+    font-size:12px;
+    line-height:2;
+    color:var(--text2);
+  }
+  .guide .hi { color:var(--accent); font-weight:600; }
+  .guide .badge {
+    display:inline-block;
+    background: rgba(192,132,252,0.15);
+    border: 1px solid rgba(192,132,252,0.3);
+    color: var(--accent);
+    border-radius:4px;
+    padding: 0px 6px;
+    font-size:10px;
+    font-weight:600;
+    margin: 0 2px;
+    vertical-align: middle;
+  }
+
+  /* ── Error 352 警告區塊 ── */
+  .alert-box {
+    background: rgba(244,114,182,0.08);
+    border: 1px solid rgba(244,114,182,0.35);
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-bottom: 12px;
+    font-size: 12px;
+    color: var(--accent2);
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    display: none;
+  }
+  .alert-box.show { display: flex; }
+  .alert-box .alert-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .alert-box .alert-text { line-height: 1.6; }
+  .alert-box .alert-action {
+    margin-top: 6px;
+  }
+
+  /* ── Divider ── */
+  .divider {
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border), transparent);
+    margin: 10px 0;
+  }
+
+  /* ── 參數操作按鈕 ── */
+  .param-action-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .btn-sm {
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-family: 'Noto Sans TC', sans-serif;
+    font-weight: 500;
+    transition: all 0.2s;
+  }
+  .btn-sm-danger {
+    background: rgba(244,114,182,0.15);
+    border: 1px solid rgba(244,114,182,0.4);
+    color: var(--accent2);
+  }
+  .btn-sm-danger:hover { background: rgba(244,114,182,0.25); }
+  .btn-sm-info {
+    background: rgba(192,132,252,0.12);
+    border: 1px solid rgba(192,132,252,0.3);
+    color: var(--accent);
+  }
+  .btn-sm-info:hover { background: rgba(192,132,252,0.22); }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width:4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius:2px; }
+
+  /* ── 增益滑桿區塊 ── */
+  .gain-section {
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .gain-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+  .gain-tag {
+    width: 40px;
+    height: 22px;
+    border-radius: 5px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+    flex-shrink: 0;
+    letter-spacing: 0.05em;
+  }
+  .gain-slider {
+    flex: 1;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    outline: none;
+  }
+  .gain-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 5px currentColor;
+  }
+  .gain-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    width: 36px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+  .output-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--dim);
+    width: 40px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🎤</div>
+      <div class="logo-text">
+        <span class="logo-title">VowelSync</span>
+        <span class="logo-sub">VTS PLUGIN v0.4 · GAIN</span>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="mode-switcher">
+        <button class="mode-btn active" id="btnModeDA"    onclick="setMode('desktop')">🎵 桌面音訊</button>
+        <button class="mode-btn"        id="btnModeVowel" onclick="setMode('vowel')">🎤 母音 AEIOU</button>
+      </div>
+      <div class="status-badge" id="vtsStatus">
+        <div class="status-dot"></div>
+        <span id="vtsStatusText">未連線</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Error 352 警告（當發生時才顯示） -->
+  <div class="alert-box" id="err352Box">
+    <div class="alert-icon">⚠️</div>
+    <div class="alert-text">
+      <strong>錯誤 352：參數名稱衝突</strong><br>
+      VTS 中已有其他插件建立了相同名稱的參數。請點下方「刪除並重建」，或先到 VTube Studio → 參數 → 手動刪除衝突的自訂參數後再重試。
+      <div class="alert-action">
+        <button class="btn-sm btn-sm-danger" onclick="deleteAndRecreateParams()">🗑️ 刪除並重建參數</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Waveform -->
+  <div class="panel" style="margin-bottom:10px">
+    <div class="panel-title">📊 波形</div>
+    <canvas id="waveCanvas"></canvas>
+  </div>
+
+  <!-- Spectrum -->
+  <div class="panel" style="margin-bottom:10px">
+    <div class="panel-title">🎛️ 頻譜分析</div>
+    <canvas id="specCanvas"></canvas>
+  </div>
+
+  <!-- Controls -->
+  <div class="controls">
+    <button class="btn btn-green"   id="btnCapture">▶ 開始捕捉音頻</button>
+    <button class="btn btn-ghost"   id="btnStop" disabled>■ 停止</button>
+    <div class="spacer"></div>
+    <button class="btn btn-primary" id="btnConnect">🔌 連接 VTube Studio</button>
+  </div>
+
+  <!-- Desktop Audio mode panel -->
+  <div id="modeDesktop">
+    <div class="panel" style="margin-bottom:10px">
+      <div class="panel-title">🎵 桌面音訊 — Volume · Frequency · Bass · Mid · High</div>
+      <div class="da-row" id="daRow"></div>
+    </div>
+  </div>
+
+  <!-- Vowel mode panel -->
+  <div id="modeVowel" style="display:none">
+    <div class="panel" style="margin-bottom:10px">
+      <div class="panel-title">🎤 母音辨識 — A · E · I · O · U</div>
+      <div class="vowels-row" id="vowelRow"></div>
+    </div>
+  </div>
+
+  <!-- Bottom grid -->
+  <div class="bottom-grid">
+
+    <!-- LEFT: Connection + Log -->
+    <div class="panel">
+      <div class="panel-title">🔌 VTube Studio 連線</div>
+      <div class="label-sm">WebSocket 地址</div>
+      <input type="text" id="vtsHost" value="ws://localhost:8001" style="margin-bottom:10px">
+      <div class="label-sm">Plugin 名稱</div>
+      <input type="text" id="pluginName" value="VowelSync" style="margin-bottom:12px">
+
+      <div class="toggle-row">
+        <span class="toggle-label">傳送至 VTube Studio</span>
+        <label class="toggle">
+          <input type="checkbox" id="sendToVts">
+          <div class="toggle-track"></div>
+        </label>
+      </div>
+
+      <div class="divider"></div>
+      <div class="panel-title" style="margin-top:4px; margin-bottom:8px">系統日誌</div>
+      <div class="log-box" id="logBox">
+        <div class="log-info">▶ 等待啟動...</div>
+      </div>
+
+      <!-- 參數管理 -->
+      <div class="param-action-row">
+        <button class="btn-sm btn-sm-info" onclick="ensureAllParams(document.getElementById('pluginName').value)">➕ 重建參數</button>
+        <button class="btn-sm btn-sm-danger" onclick="deleteAndRecreateParams()">🗑️ 刪除並重建</button>
+      </div>
+    </div>
+
+    <!-- RIGHT: Params + Settings -->
+    <div class="panel">
+      <!-- Desktop audio param mappings -->
+      <div class="tab-params active" id="tabDA">
+        <div class="panel-title">🗺️ 參數映射 — 桌面音訊</div>
+        <div id="daParamMappings"></div>
+        <!-- DA 增益 -->
+        <div class="gain-section">
+          <div class="panel-title" style="margin-bottom:8px">🎚️ 個別增益（×倍）<span style="color:var(--dim);font-size:9px;margin-left:6px;font-weight:400">→ VTS輸出(0~10)</span></div>
+          <div id="daGainSliders"></div>
+        </div>
+      </div>
+
+      <!-- Vowel param mappings -->
+      <div class="tab-params" id="tabVowel">
+        <div class="panel-title">🗺️ 參數映射 — 母音</div>
+        <div id="vowelParamMappings"></div>
+        <!-- Vowel 增益 -->
+        <div class="gain-section">
+          <div class="panel-title" style="margin-bottom:8px">🎚️ 個別增益（×倍）<span style="color:var(--dim);font-size:9px;margin-left:6px;font-weight:400">→ VTS輸出(0~10)</span></div>
+          <div id="vowelGainSliders"></div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="panel-title" style="margin-top:4px">⚙️ 全域設定</div>
+      <div class="slider-wrap">
+        <span class="slider-label">平滑</span>
+        <input type="range" id="smoothing" min="0" max="0.95" step="0.05" value="0.6">
+        <span class="slider-val" id="smoothVal">0.60</span>
+      </div>
+      <div class="slider-wrap">
+        <span class="slider-label">靈敏度</span>
+        <input type="range" id="sensitivity" min="1" max="10" step="0.5" value="4">
+        <span class="slider-val" id="sensVal">4.0</span>
+      </div>
+      <div class="toggle-row">
+        <span class="toggle-label">靜音門檻過濾</span>
+        <label class="toggle">
+          <input type="checkbox" id="silenceFilter" checked>
+          <div class="toggle-track"></div>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- Guide -->
+  <div class="panel" style="margin-top:12px; border-color:rgba(192,132,252,0.2)">
+    <div class="panel-title">📖 使用說明</div>
+    <div class="guide">
+      1. VTube Studio → Plugins → 允許第三方插件<br>
+      2. 點「連接 VTube Studio」→ 在 VTS 視窗中允許<br>
+      3. 點「開始捕捉音頻」→ 選擇分頁/桌面，並勾選<span class="hi">「分享音訊」</span><br>
+      4. <span class="hi">桌面音訊模式</span>：音量 / 主頻率 / Bass / Mid / High → 對應 DesktopAudio* 參數<br>
+      5. <span class="hi">母音模式</span>：A/E/I/O/U 共振峰分析 → 適合語音/唱歌口型<br>
+      6. 開啟「傳送至 VTube Studio」即可驅動模型參數<br>
+      <br>
+      <span class="badge">⚠️ 錯誤 352</span> 若發生參數衝突，請點左側「<span class="hi">刪除並重建</span>」按鈕，或在 VTS 內手動刪除舊的自訂參數<br>
+      <br>
+      <span class="hi">★ 兩組參數可同時存在 VTS，隨時切換模式無需重新連線</span>
+    </div>
+  </div>
+
+</div><!-- /app -->
+<script>
+// ══════════════════════════════════════════════════════
+//  CONFIG
+// ══════════════════════════════════════════════════════
+const VOWELS = ['A','E','I','O','U'];
+const VOWEL_COLORS = { A:'#f472b6', E:'#fbbf24', I:'#818cf8', O:'#c084fc', U:'#34d399' };
+
+const VOWEL_FORMANTS = {
+  A: { f1:[700,900],  f2:[1000,1400] },
+  E: { f1:[350,550],  f2:[1900,2500] },
+  I: { f1:[250,380],  f2:[2200,3000] },
+  O: { f1:[400,600],  f2:[700,1100]  },
+  U: { f1:[250,380],  f2:[600,900]   },
+};
+
+const DA_ITEMS = [
+  { id:'vol',  label:'VOLUME',    color:'#818cf8', def:'DesktopAudioVolume'    },
+  { id:'freq', label:'FREQUENCY', color:'#fbbf24', def:'DesktopAudioFrequency' },
+  { id:'bass', label:'BASS',      color:'#f472b6', def:'DesktopAudioBass'      },
+  { id:'mid',  label:'MID',       color:'#c084fc', def:'DesktopAudioMid'       },
+  { id:'high', label:'HIGH',      color:'#34d399', def:'DesktopAudioHigh'      },
+];
+
+const BAND_RANGES = {
+  bass: [20,   250],
+  mid:  [250,  4000],
+  high: [4000, 20000],
+};
+
+let currentMode = 'desktop';
+let audioCtx = null, analyser = null, stream = null, animFrameId = null;
+let ws = null, authToken = '';
+let vtsIntervalId = null; // ★ 背景傳送用，不依賴 rAF
+
+let smoothedDA    = { vol:0, freq:0, bass:0, mid:0, high:0 };
+let smoothedVowel = { A:0, E:0, I:0, O:0, U:0 };
+let daParamNames    = Object.fromEntries(DA_ITEMS.map(d=>[d.id,d.def]));
+let vowelParamNames = { A:'VowelA', E:'VowelE', I:'VowelI', O:'VowelO', U:'VowelU' };
+
+// ★ 個別增益（預設 10×，讓輸出值更容易到達 10）
+let daGain    = { vol:10, freq:10, bass:10, mid:10, high:10 };
+let vowelGain = { A:10, E:10, I:10, O:10, U:10 };
+
+// 套用增益並輸出到 0~10 範圍
+function applyGain(rawVal, gain) {
+  return Math.min(rawVal * gain * 10, 10);
+}
+
+// ══════════════════════════════════════════════════════
+//  MODE SWITCH
+// ══════════════════════════════════════════════════════
+function setMode(mode) {
+  currentMode = mode;
+  const isDA = mode === 'desktop';
+  document.getElementById('modeDesktop').style.display = isDA ? 'block' : 'none';
+  document.getElementById('modeVowel').style.display   = isDA ? 'none'  : 'block';
+  document.getElementById('btnModeDA').classList.toggle('active', isDA);
+  document.getElementById('btnModeVowel').classList.toggle('active', !isDA);
+  document.getElementById('tabDA').classList.toggle('active', isDA);
+  document.getElementById('tabVowel').classList.toggle('active', !isDA);
+  log(`切換 → ${isDA ? '桌面音訊模式' : '母音 AEIOU 模式'}`, 'log-info');
+}
+
+// ══════════════════════════════════════════════════════
+//  BUILD UI
+// ══════════════════════════════════════════════════════
+(function buildUI() {
+  // Desktop audio cards
+  const daRow = document.getElementById('daRow');
+  DA_ITEMS.forEach(d => {
+    const c = document.createElement('div');
+    c.className = 'da-card'; c.dataset.da = d.id; c.id = `daCard-${d.id}`;
+    c.innerHTML = `
+      <div class="da-label">${d.label}</div>
+      <div class="da-value" id="daVal-${d.id}" style="color:${d.color}">0.00</div>
+      <div class="da-bar-wrap"><div class="da-bar" id="daBar-${d.id}" style="background:${d.color}"></div></div>
+      <div class="da-param-name" id="daPN-${d.id}">${d.def}</div>`;
+    daRow.appendChild(c);
+  });
+
+  // DA param mappings
+  const daMap = document.getElementById('daParamMappings');
+  DA_ITEMS.forEach(d => {
+    const row = document.createElement('div'); row.className = 'param-row';
+    row.innerHTML = `<div class="tag" data-da="${d.id}">${d.label.slice(0,4)}</div>
+      <input type="text" id="daparam-${d.id}" value="${d.def}" placeholder="VTS 參數名稱">`;
+    daMap.appendChild(row);
+    setTimeout(() => {
+      const inp = document.getElementById(`daparam-${d.id}`);
+      if (inp) inp.addEventListener('input', e => {
+        daParamNames[d.id] = e.target.value;
+        const pn = document.getElementById(`daPN-${d.id}`);
+        if (pn) pn.textContent = e.target.value;
+      });
+    }, 0);
+  });
+
+  // Vowel cards
+  const vRow = document.getElementById('vowelRow');
+  VOWELS.forEach(v => {
+    const c = document.createElement('div');
+    c.className = 'vowel-card'; c.dataset.v = v; c.id = `vCard-${v}`;
+    c.innerHTML = `
+      <div class="vowel-letter" style="color:${VOWEL_COLORS[v]}">${v}</div>
+      <div class="vowel-bar-wrap"><div class="vowel-bar" id="vBar-${v}" style="background:${VOWEL_COLORS[v]}"></div></div>
+      <div class="vowel-value" id="vVal-${v}" style="color:${VOWEL_COLORS[v]}">0.00</div>`;
+    vRow.appendChild(c);
+  });
+
+  // Vowel param mappings
+  const vMap = document.getElementById('vowelParamMappings');
+  VOWELS.forEach(v => {
+    const row = document.createElement('div'); row.className = 'param-row';
+    row.innerHTML = `<div class="tag" data-v="${v}">${v}</div>
+      <input type="text" id="vparam-${v}" value="${vowelParamNames[v]}" placeholder="VTS 參數名稱">`;
+    vMap.appendChild(row);
+    setTimeout(() => {
+      const inp = document.getElementById(`vparam-${v}`);
+      if (inp) inp.addEventListener('input', e => { vowelParamNames[v] = e.target.value; });
+    }, 0);
+  });
+
+  // ── 建立 DA 增益滑桿 ──
+  const daGainCont = document.getElementById('daGainSliders');
+  DA_ITEMS.forEach(d => {
+    const row = document.createElement('div'); row.className = 'gain-row';
+    row.innerHTML = `
+      <div class="gain-tag" style="background:${d.color}22;color:${d.color}">${d.label.slice(0,4)}</div>
+      <input class="gain-slider" type="range" id="daGain-${d.id}" min="1" max="20" step="0.5" value="10"
+        style="--thumb-color:${d.color}">
+      <span class="gain-val" style="color:${d.color}" id="daGainVal-${d.id}">×10</span>
+      <span class="output-val" id="daOut-${d.id}">→ 0.00</span>`;
+    daGainCont.appendChild(row);
+    setTimeout(() => {
+      const sl = document.getElementById(`daGain-${d.id}`);
+      if (sl) sl.addEventListener('input', e => {
+        const v = parseFloat(e.target.value);
+        daGain[d.id] = v;
+        document.getElementById(`daGainVal-${d.id}`).textContent = `×${v.toFixed(1)}`;
+      });
+      // thumb color via CSS
+      const style = document.createElement('style');
+      style.textContent = `#daGain-${d.id}::-webkit-slider-thumb { background:${d.color}; }`;
+      document.head.appendChild(style);
+    }, 0);
+  });
+
+  // ── 建立 Vowel 增益滑桿 ──
+  const vGainCont = document.getElementById('vowelGainSliders');
+  VOWELS.forEach(v => {
+    const color = VOWEL_COLORS[v];
+    const row = document.createElement('div'); row.className = 'gain-row';
+    row.innerHTML = `
+      <div class="gain-tag" style="background:${color}22;color:${color};font-size:14px">${v}</div>
+      <input class="gain-slider" type="range" id="vGain-${v}" min="1" max="20" step="0.5" value="10">
+      <span class="gain-val" style="color:${color}" id="vGainVal-${v}">×10</span>
+      <span class="output-val" id="vOut-${v}">→ 0.00</span>`;
+    vGainCont.appendChild(row);
+    setTimeout(() => {
+      const sl = document.getElementById(`vGain-${v}`);
+      if (sl) sl.addEventListener('input', e => {
+        const val = parseFloat(e.target.value);
+        vowelGain[v] = val;
+        document.getElementById(`vGainVal-${v}`).textContent = `×${val.toFixed(1)}`;
+      });
+      const style = document.createElement('style');
+      style.textContent = `#vGain-${v}::-webkit-slider-thumb { background:${color}; }`;
+      document.head.appendChild(style);
+    }, 0);
+  });
+})();
+
+// ══════════════════════════════════════════════════════
+//  LOG
+// ══════════════════════════════════════════════════════
+function log(msg, cls='') {
+  const box = document.getElementById('logBox');
+  const div = document.createElement('div'); div.className = cls;
+  const ts = new Date().toLocaleTimeString('zh-TW',{hour12:false});
+  div.textContent = `[${ts}] ${msg}`;
+  box.appendChild(div);
+  box.scrollTop = box.scrollHeight;
+}
+
+// ══════════════════════════════════════════════════════
+//  CANVAS
+// ══════════════════════════════════════════════════════
+const waveCanvas = document.getElementById('waveCanvas');
+const waveCtx    = waveCanvas.getContext('2d');
+const specCanvas = document.getElementById('specCanvas');
+const specCtx    = specCanvas.getContext('2d');
+
+function resizeCanvases() {
+  [waveCanvas,specCanvas].forEach(c=>{
+    c.width  = c.offsetWidth  * window.devicePixelRatio;
+    c.height = c.offsetHeight * window.devicePixelRatio;
+  });
+}
+resizeCanvases();
+window.addEventListener('resize', resizeCanvases);
+
+// ══════════════════════════════════════════════════════
+//  AUDIO CAPTURE
+// ══════════════════════════════════════════════════════
+document.getElementById('btnCapture').addEventListener('click', async () => {
+  try {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    try {
+      stream = await navigator.mediaDevices.getDisplayMedia({
+        video:{width:1,height:1},
+        audio:{echoCancellation:false,noiseSuppression:false,sampleRate:44100}
+      });
+      log('桌面音頻捕捉成功（請確認已勾選「分享音訊」）','log-ok');
+    } catch(e) {
+      stream = await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false}});
+      log('已切換使用麥克風','log-info');
+    }
+    const source = audioCtx.createMediaStreamSource(stream);
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.2;
+    source.connect(analyser);
+    document.getElementById('btnCapture').disabled = true;
+    document.getElementById('btnStop').disabled = false;
+    log('開始音頻分析','log-ok');
+    drawLoop();
+    startVtsLoop(); // ★ 獨立的 VTS 傳送迴圈，背景也能運作
+  } catch(e) { log('錯誤: '+e.message,'log-err'); }
+});
+
+document.getElementById('btnStop').addEventListener('click', () => {
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  if (vtsIntervalId) { clearInterval(vtsIntervalId); vtsIntervalId = null; }
+  if (stream) stream.getTracks().forEach(t=>t.stop());
+  if (audioCtx) audioCtx.close();
+  analyser = null;
+  document.getElementById('btnCapture').disabled = false;
+  document.getElementById('btnStop').disabled = true;
+  log('已停止','log-info');
+});
+
+// ══════════════════════════════════════════════════════
+//  ANALYSIS HELPERS
+// ══════════════════════════════════════════════════════
+function getSmoothing()   { return parseFloat(document.getElementById('smoothing').value); }
+function getSensitivity() { return parseFloat(document.getElementById('sensitivity').value); }
+
+function rangeEnergy(fd, sr, bl, lo, hi) {
+  const blo = Math.max(0, Math.round(lo/(sr/bl)));
+  const bhi = Math.min(fd.length-1, Math.round(hi/(sr/bl)));
+  let sum=0, cnt=0;
+  for (let i=blo;i<=bhi;i++){sum+=fd[i];cnt++;}
+  return cnt?sum/cnt:0;
+}
+
+function analyzeDA(fd, sr, bl) {
+  const sm=getSmoothing(), sens=getSensitivity();
+  const vol = rangeEnergy(fd,sr,bl,20,20000);
+  const silence = document.getElementById('silenceFilter').checked && vol<4;
+
+  const bass = rangeEnergy(fd,sr,bl,...BAND_RANGES.bass);
+  const mid  = rangeEnergy(fd,sr,bl,...BAND_RANGES.mid);
+  const high = rangeEnergy(fd,sr,bl,...BAND_RANGES.high);
+
+  const nyq = sr/2;
+  let wSum=0, tMag=0;
+  for(let i=0;i<fd.length;i++){wSum+=fd[i]*(i/fd.length*nyq);tMag+=fd[i];}
+  const domFreq = tMag>0?wSum/tMag:0;
+  const freqNorm = Math.min(domFreq/8000,1);
+
+  const raw = {
+    vol:  Math.min(vol /255*sens*0.5,1),
+    freq: silence?0:freqNorm,
+    bass: Math.min(bass/255*sens*0.6,1),
+    mid:  Math.min(mid /255*sens*0.5,1),
+    high: Math.min(high/255*sens*0.8,1),
+  };
+
+  Object.keys(raw).forEach(k=>{
+    const v = silence?0:raw[k];
+    smoothedDA[k] = smoothedDA[k]*sm + v*(1-sm);
+  });
+  return smoothedDA;
+}
+
+function analyzeVowels(fd, sr, bl) {
+  const sm=getSmoothing(), sens=getSensitivity();
+  const total = rangeEnergy(fd,sr,bl,80,4000);
+  const silence = document.getElementById('silenceFilter').checked && total<4;
+  const raw={};
+  VOWELS.forEach(v=>{
+    const fm=VOWEL_FORMANTS[v];
+    raw[v] = rangeEnergy(fd,sr,bl,fm.f1[0],fm.f1[1])*0.6
+           + rangeEnergy(fd,sr,bl,fm.f2[0],fm.f2[1])*0.4;
+  });
+  const maxRaw=Math.max(...Object.values(raw),1);
+  VOWELS.forEach(v=>{
+    let n=silence?0:Math.min(raw[v]/maxRaw*sens*0.2,1);
+    smoothedVowel[v]=smoothedVowel[v]*sm+n*(1-sm);
+  });
+  return smoothedVowel;
+}
+
+// ══════════════════════════════════════════════════════
+//  DRAW LOOP
+// ══════════════════════════════════════════════════════
+function drawLoop() {
+  if (!analyser) return;
+  const bl = analyser.frequencyBinCount;
+  const td = new Uint8Array(bl), fd = new Uint8Array(bl);
+  analyser.getByteTimeDomainData(td);
+  analyser.getByteFrequencyData(fd);
+  const sr = audioCtx.sampleRate;
+  const nyq = sr/2;
+  const dpr = window.devicePixelRatio;
+
+  const W=waveCanvas.width, H=waveCanvas.height;
+  const SW=specCanvas.width, SH=specCanvas.height;
+
+  // Waveform
+  waveCtx.fillStyle='#08061a'; waveCtx.fillRect(0,0,W,H);
+  waveCtx.beginPath();
+  waveCtx.strokeStyle = currentMode==='desktop'?'#818cf8':'#f472b6';
+  waveCtx.lineWidth=1.5*dpr;
+  const sw=W/bl; let x=0;
+  for(let i=0;i<bl;i++){
+    const v=td[i]/128; const y=v*H/2;
+    i===0?waveCtx.moveTo(x,y):waveCtx.lineTo(x,y);
+    x+=sw;
+  }
+  waveCtx.stroke();
+
+  // Spectrum
+  specCtx.fillStyle='#08061a'; specCtx.fillRect(0,0,SW,SH);
+  function fX(f){return(f/nyq)*SW;}
+
+  if(currentMode==='desktop'){
+    [{r:BAND_RANGES.bass,c:'#f472b618'},{r:BAND_RANGES.mid,c:'#c084fc14'},{r:BAND_RANGES.high,c:'#34d39914'}].forEach(z=>{
+      specCtx.fillStyle=z.c;
+      specCtx.fillRect(fX(z.r[0]),0,fX(z.r[1])-fX(z.r[0]),SH);
+    });
+    const glowItems=[{r:BAND_RANGES.bass,c:'#f472b6',k:'bass'},{r:BAND_RANGES.mid,c:'#c084fc',k:'mid'},{r:BAND_RANGES.high,c:'#34d399',k:'high'}];
+    glowItems.forEach(g=>{
+      const a=Math.min(smoothedDA[g.k]*0.5,0.35);
+      if(a>0.02){
+        specCtx.fillStyle=g.c; specCtx.globalAlpha=a;
+        specCtx.fillRect(fX(g.r[0]),0,fX(g.r[1])-fX(g.r[0]),SH);
+        specCtx.globalAlpha=1;
+      }
+    });
+    specCtx.font=`${8.5*dpr}px Share Tech Mono,monospace`;
+    specCtx.fillStyle='#5a4f7a';
+    specCtx.fillText('BASS',fX(30)+3,SH-3);
+    specCtx.fillText('MID',fX(260)+3,SH-3);
+    specCtx.fillText('HIGH',fX(4100)+3,SH-3);
+  } else {
+    VOWELS.forEach(v=>{
+      const fm=VOWEL_FORMANTS[v];
+      const a=Math.min(smoothedVowel[v]*2,0.35)+0.04;
+      specCtx.fillStyle=VOWEL_COLORS[v]; specCtx.globalAlpha=a;
+      specCtx.fillRect(fX(fm.f1[0]),0,fX(fm.f1[1])-fX(fm.f1[0]),SH);
+      specCtx.fillRect(fX(fm.f2[0]),0,fX(fm.f2[1])-fX(fm.f2[0]),SH);
+      specCtx.globalAlpha=1;
+    });
+  }
+
+  const bw=SW/(bl/2);
+  for(let i=0;i<bl/2;i++){
+    const val=fd[i]/255, bh=val*SH;
+    const freq=i*nyq/(bl/2);
+    let col;
+    if(currentMode==='desktop')
+      col=freq<250?'#f472b666':freq<4000?'#c084fc55':'#34d39955';
+    else
+      col=freq<1000?'#818cf855':freq<3000?'#c084fc55':'#f472b655';
+    specCtx.fillStyle=col;
+    specCtx.fillRect(i*bw,SH-bh,bw,bh);
+  }
+
+  // Update cards only (no VTS send here — handled by startVtsLoop)
+  if(currentMode==='desktop'){
+    const da=analyzeDA(fd,sr,bl);
+    DA_ITEMS.forEach(d=>{
+      const rawV = da[d.id];
+      const outV = applyGain(rawV, daGain[d.id]);
+      document.getElementById(`daBar-${d.id}`).style.height=(outV/10*100).toFixed(1)+'%';
+      document.getElementById(`daVal-${d.id}`).textContent=outV.toFixed(2);
+      document.getElementById(`daCard-${d.id}`).classList.toggle('active',outV>1);
+      const outEl = document.getElementById(`daOut-${d.id}`);
+      if(outEl) outEl.textContent=`→ ${outV.toFixed(2)}`;
+    });
+  } else {
+    const sv=analyzeVowels(fd,sr,bl);
+    VOWELS.forEach(v=>{
+      const rawV = sv[v];
+      const outV = applyGain(rawV, vowelGain[v]);
+      document.getElementById(`vBar-${v}`).style.height=(outV/10*100).toFixed(1)+'%';
+      document.getElementById(`vVal-${v}`).textContent=outV.toFixed(2);
+      document.getElementById(`vCard-${v}`).classList.toggle('active',outV>2);
+      const outEl = document.getElementById(`vOut-${v}`);
+      if(outEl) outEl.textContent=`→ ${outV.toFixed(2)}`;
+    });
+  }
+
+  animFrameId=requestAnimationFrame(drawLoop);
+}
+
+// ══════════════════════════════════════════════════════
+//  ★ 獨立 VTS 傳送迴圈（用 setInterval，背景分頁也能持續運作）
+// ══════════════════════════════════════════════════════
+function startVtsLoop() {
+  if (vtsIntervalId) clearInterval(vtsIntervalId);
+  vtsIntervalId = setInterval(() => {
+    if (!analyser || !document.getElementById('sendToVts').checked) return;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+
+    const bl = analyser.frequencyBinCount;
+    const fd = new Uint8Array(bl);
+    analyser.getByteFrequencyData(fd);
+    const sr = audioCtx.sampleRate;
+
+    if (currentMode === 'desktop') {
+      const da = analyzeDA(fd, sr, bl);
+      sendVtsDA(da);
+    } else {
+      const sv = analyzeVowels(fd, sr, bl);
+      sendVtsVowel(sv);
+    }
+  }, 33); // ~30fps，切換畫面也不受影響
+}
+
+// ══════════════════════════════════════════════════════
+//  VTube Studio WebSocket
+// ══════════════════════════════════════════════════════
+document.getElementById('btnConnect').addEventListener('click', connectVts);
+
+function connectVts() {
+  const host=document.getElementById('vtsHost').value;
+  const name=document.getElementById('pluginName').value;
+  if(ws) ws.close();
+  ws=new WebSocket(host);
+  ws.onopen=()=>{
+    log('已連接 VTS WebSocket','log-ok');
+    ws.send(JSON.stringify({apiName:'VTubeStudioPublicAPI',apiVersion:'1.0',requestID:'ping',messageType:'APIStateRequest'}));
+  };
+  ws.onmessage=(e)=>{
+    const msg=JSON.parse(e.data);
+
+    if(msg.messageType==='APIStateResponse'){
+      log('VTS API 就緒，請求認證...','log-info');
+      ws.send(JSON.stringify({apiName:'VTubeStudioPublicAPI',apiVersion:'1.0',requestID:'authToken',
+        messageType:'AuthenticationTokenRequest',
+        data:{pluginName:name,pluginDeveloper:'VowelSync',pluginIcon:''}}));
+
+    } else if(msg.messageType==='AuthenticationTokenResponse'){
+      authToken=msg.data.authenticationToken;
+      log('已取得 Token，認證中...','log-info');
+      ws.send(JSON.stringify({apiName:'VTubeStudioPublicAPI',apiVersion:'1.0',requestID:'auth',
+        messageType:'AuthenticationRequest',
+        data:{pluginName:name,pluginDeveloper:'VowelSync',authenticationToken:authToken}}));
+
+    } else if(msg.messageType==='AuthenticationResponse'){
+      if(msg.data.authenticated){
+        log('✓ VTube Studio 認證成功！','log-ok');
+        document.getElementById('vtsStatus').classList.add('connected');
+        document.getElementById('vtsStatusText').textContent='已連線';
+        ensureAllParams(name);
+      } else { log('✗ 認證失敗: '+msg.data.reason,'log-err'); }
+
+    } else if(msg.messageType==='ParameterCreationResponse'){
+      // ★ 修正：偵測錯誤 352（參數名稱衝突）
+      if(msg.data?.errorID === 352) {
+        log('⚠️ 錯誤 352：參數名稱衝突，請使用「刪除並重建」','log-warn');
+        document.getElementById('err352Box').classList.add('show');
+      }
+
+    } else if(msg.messageType==='ParameterDeletionResponse'){
+      if(!msg.data?.errorID){
+        log(`已刪除參數：${msg.data?.parameterName || '?'}`, 'log-info');
+      }
+
+    } else if(msg.data?.errorID){
+      // ★ 修正：在所有回應中統一偵測 352
+      if(msg.data.errorID === 352){
+        log('⚠️ 錯誤 352：參數已存在（其他插件建立）— 請點「刪除並重建」','log-warn');
+        document.getElementById('err352Box').classList.add('show');
+      } else {
+        log('VTS 錯誤 '+msg.data.errorID+': '+msg.data.message,'log-err');
+      }
+    }
+  };
+  ws.onclose=()=>{
+    log('VTS 連線斷開','log-err');
+    document.getElementById('vtsStatus').classList.remove('connected');
+    document.getElementById('vtsStatusText').textContent='未連線';
+  };
+  ws.onerror=()=>log('WebSocket 錯誤','log-err');
+}
+
+// ── 建立所有參數 ──
+function ensureAllParams(name) {
+  if(!ws || ws.readyState!==WebSocket.OPEN){
+    log('尚未連線至 VTS','log-err'); return;
+  }
+  let delay=0;
+  const all=[
+    ...DA_ITEMS.map(d=>({n:daParamNames[d.id],   ex:`Desktop audio ${d.label} — VowelSync`})),
+    ...VOWELS.map(v=>({n:vowelParamNames[v],      ex:`Vowel ${v} formant — VowelSync`})),
+  ];
+  // 隱藏 352 警告
+  document.getElementById('err352Box').classList.remove('show');
+  all.forEach(p=>{
+    setTimeout(()=>{
+      if(ws?.readyState===WebSocket.OPEN){
+        ws.send(JSON.stringify({apiName:'VTubeStudioPublicAPI',apiVersion:'1.0',
+          requestID:`cp_${p.n}`,messageType:'ParameterCreationRequest',
+          data:{parameterName:p.n,explanation:p.ex,min:0,max:10,defaultValue:0}}));
+      }
+    }, delay);
+    delay+=120;
+  });
+  log(`正在建立 ${all.length} 個 VTS 參數...`,'log-info');
+}
+
+// ★ 修正：刪除現有參數後再重建（解決錯誤 352）
+function deleteAndRecreateParams() {
+  if(!ws || ws.readyState!==WebSocket.OPEN){
+    log('尚未連線至 VTS，請先連線','log-err'); return;
+  }
+  const all=[
+    ...DA_ITEMS.map(d=>daParamNames[d.id]),
+    ...VOWELS.map(v=>vowelParamNames[v]),
+  ];
+  log(`正在刪除 ${all.length} 個參數，稍後重建...`,'log-warn');
+  document.getElementById('err352Box').classList.remove('show');
+
+  let delay=0;
+  all.forEach(paramName=>{
+    setTimeout(()=>{
+      if(ws?.readyState===WebSocket.OPEN){
+        ws.send(JSON.stringify({
+          apiName:'VTubeStudioPublicAPI',apiVersion:'1.0',
+          requestID:`del_${paramName}`,
+          messageType:'ParameterDeletionRequest',
+          data:{parameterName: paramName}
+        }));
+      }
+    }, delay);
+    delay+=100;
+  });
+
+  // 刪完後稍待再重建
+  setTimeout(()=>{
+    log('刪除完成，重新建立參數...','log-info');
+    ensureAllParams(document.getElementById('pluginName').value);
+  }, delay+400);
+}
+
+// ── 注入參數值 ──
+function injectParams(reqID, parameterValues) {
+  ws.send(JSON.stringify({
+    apiName:'VTubeStudioPublicAPI',apiVersion:'1.0',
+    requestID:reqID,messageType:'InjectParameterDataRequest',
+    data:{faceFound:false,mode:'set',parameterValues}
+  }));
+}
+
+function sendVtsDA(da) {
+  injectParams('injectDA', DA_ITEMS.map(d=>({
+    id: daParamNames[d.id],
+    value: parseFloat(applyGain(da[d.id], daGain[d.id]).toFixed(4))
+  })));
+}
+function sendVtsVowel(sv) {
+  injectParams('injectVowels', VOWELS.map(v=>({
+    id: vowelParamNames[v],
+    value: parseFloat(applyGain(sv[v], vowelGain[v]).toFixed(4))
+  })));
+}
+
+// ══════════════════════════════════════════════════════
+//  SLIDER DISPLAY
+// ══════════════════════════════════════════════════════
+document.getElementById('smoothing').addEventListener('input',e=>{
+  document.getElementById('smoothVal').textContent=parseFloat(e.target.value).toFixed(2);
+});
+document.getElementById('sensitivity').addEventListener('input',e=>{
+  document.getElementById('sensVal').textContent=parseFloat(e.target.value).toFixed(1);
+});
+</script>
+</body>
+</html>
