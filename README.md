@@ -1,1 +1,1 @@
-# Live2D-
+# HakkaNekoLive2D
