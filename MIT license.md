@@ -1,1 +1,1 @@
-# HakkaNekoLive2D
+MIT license
